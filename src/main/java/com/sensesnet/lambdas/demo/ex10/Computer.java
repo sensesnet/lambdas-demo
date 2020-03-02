@@ -10,9 +10,9 @@ public class Computer
 {
     private String type;
     private String company;
-    private int price;
+    private Integer price;
 
-    public Computer(String type, String company, int price)
+    public Computer(String type, String company, Integer price)
     {
         this.type = type;
         this.company = company;
@@ -29,7 +29,7 @@ public class Computer
         return company;
     }
 
-    public int getPrice()
+    public Integer getPrice()
     {
         return price;
     }
