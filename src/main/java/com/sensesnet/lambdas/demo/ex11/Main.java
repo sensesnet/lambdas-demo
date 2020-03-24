@@ -1,11 +1,7 @@
 package com.sensesnet.lambdas.demo.ex11;
 
-import com.sensesnet.lambdas.demo.ex6.Pizza;
-import jdk.nashorn.internal.ir.annotations.Immutable;
-
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Stream;
 
 /**
  * @author sensesnet <br />
