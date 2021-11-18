@@ -1,6 +1,8 @@
 package com.sensesnet.lambdas.demo.ex1;
 
 
+import java.util.function.Function;
+
 /**
  * @author sensesnet <br />
  * Copyright 2020 Eshted LLC. All rights reserved.
@@ -11,6 +13,12 @@ public class Main
 {
     public static void main(String[] args)
     {
+        int constant = 100;
+        Function<Integer, Integer> adder = x -> x + constant;
+
+        System.out.println(adder.apply(200));
+        System.out.println(adder.apply(300));
+
         // operations inter impl
         Operation operation = new Operation()
         {
