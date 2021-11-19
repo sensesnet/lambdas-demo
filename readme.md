@@ -1,4 +1,4 @@
-###Understanding lambda expressions
+********###Understanding lambda expressions
 By lambda expression we mean an anonymous function that allows to use code as data and pass it as an argument to a method.
 In previous versions of java many developers used anonymous classes for these purposes. But this solution had some problems: a code was unclear and had redundancy.
 
@@ -137,7 +137,7 @@ COMPOSING FUNCTIONS
 
 In java 8, the functional interface Function<T, R> has two default methods compose(...) and andThen(...) for composing new functions. The main difference between these methods is the execution order.
 
-Generally, f.compose(g).apply(x) is the same as f(g(x)), and f.andThen(g).apply(x) is the same as g(f(x)).
+**Generally, f.compose(g).apply(x) is the same as f(g(x)), and f.andThen(g).apply(x) is the same as g(f(x)).**
 
 Let's see an example with two functions: adder and multiplier.
 ```
