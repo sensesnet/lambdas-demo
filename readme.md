@@ -648,3 +648,143 @@ Account{number='72300002', sum=7000000, isLocked=false}
 ]
 ```
 Also, **forEach** may be used for logging each element from a collection or during testing with assert statements inside a lambda.
+
+##**Main topics:**
+
+###producing collections;
+###partitioning and grouping;
+###producing values;
+###downstream collectors.
+
+##Producing collections
+Any stream has a method collect() that allows to produce collections (Lists, Sets, Maps and others).
+
+Let's assume, we have a list of accounts. Each account has a balance (Long), an unique number (String) and some other fields.
+
+In this case we can:
+
+- accumulate numbers into a List<String>
+```
+List<String> numberList = accounts.stream()
+.map(Account::getNumber)
+.collect(Collectors.toList());
+```
+- or into a Set<String>
+```
+Set<String> numberSet = accounts.stream()
+.map(Account::getNumber)
+.collect(Collectors.toSet());
+```
+
+or even collect numbers and balances into a Map<String, Long>:
+```
+Map<String, Long> numberToBalanceMap = accounts.stream()
+.collect(Collectors.toMap(Account::getNumber, Account::getBalance));
+```
+When you try to collect elements into a List<T> or a Set<T>, the concrete implementation of the collection is chosen by the stream framework. It's possible to choose a concrete collection manually:
+
+```
+stream().collect(Collectors.toCollection(HashSet::new));
+```
+Sometimes we need to collect elements into a thread-safe collection like a ConcurrentMap. We can do it.
+
+##Partitioning and grouping
+Partitioning is an operation that splits your data by a predicate into map of two collections. The key of the map has a type Boolean.
+For example we will split all accounts into two lists by a predicate: balance >= 10000:
+```
+Map<Boolean, List<Account>> partByBalance = accounts.stream()
+.collect(Collectors.partitioningBy(a -> a.getBalance() >= 10000));
+```
+
+The representation of this map:
+```
+{
+false=[Account{balance=3333, number='530012'}, Account{balance=0, number='681891'}],
+true=[Account{balance=15000, number='771843'}]
+}
+```
+Grouping is a more general operation than partitioning. Instead of splitting your data into two groups (true and false), you can use any numbers of any groups.
+Let's assume our accounts also have a state field (enum) with 3 possible values: ACTIVE, BLOCKED and REMOVED. Let's group them by state:
+```
+Map<Account.State, List<Account>> groupingByState = accounts.stream()
+.collect(Collectors.groupingBy(Account::getState));
+```
+The representation of this map:
+```
+{
+REMOVED=[Account{balance=0, number='681891', state='REMOVED'}],
+ACTIVE=[Account{balance=3333, number='530012', state='ACTIVE'}],
+BLOCKED=[Account{balance=15000, number='771843', state='BLOCKED'}]
+}
+```
+
+##Producing values
+Let's consider some Collectors that produce a single value:
+
+- summingInt, summingLong, summingDouble;
+- averagingInt, averagingLong, averagingDouble;
+- maxBy, minBy
+- counting
+NOTE: to make your code more clear and short you can perform static import of necessary collectors.
+```
+import static java.util.stream.Collectors.averagingLong;
+import static java.util.stream.Collectors.summingLong;
+```
+
+Now, we can summarize balances on the accounts:
+```
+long summary = accounts.stream()
+.collect(summingLong(Account::getBalance));
+```
+Pay attention, averaging collectors return a double values even your field is long.
+```
+double average = accounts.stream()
+.collect(averagingLong(Account::getBalance));
+```
+Also, there is more general collector reducing exists.
+Let's concatenate all account numbers into one big number (just for fun) using reducing collector:
+```
+String meganumber = accounts.stream()
+.collect(reducing("", Account::getNumber, String::concat));
+```
+Arguments of reducing collector:
+- **identity** is a first value to combine results (optional)
+- **mapper** function allows to transform all elements before reducing (optional)
+- **reducer** is a operator to combine pair of values into single value (mandatory!!!)
+Of course, we didn't consider all combiners in Stream API and we don't try to do this.
+
+##Downstream collectors
+Some collectors such as groupingBy and partitioningBy can accept other collectors as parameters. These "others" collectors are called downstream collectors. As a collector produces a value, a downstream collector produces a part of the value, which is used by the main collector.
+
+For instance, we can group elements by a field and calculate some aggregate value for grouping elements.
+
+Let's see an example.  Our data set is a collection of accounts again.
+```
+List<Account> accounts = Stream.of(
+new Account("530012", 3333L, Account.State.ACTIVE),
+new Account("771843", 15000L, Account.State.BLOCKED),
+new Account("234465", 12000L, Account.State.ACTIVE),
+new Account("110011", 8800L, Account.State.ACTIVE),
+new Account("462181", 45000L, Account.State.BLOCKED),
+new Account("681891", 0L, Account.State.REMOVED)
+).collect(toList());
+```
+To calculate the total sums of blocked, active and removed accounts we can use downstream collectors like this:
+```
+Map<Account.State, Long> sumByStates = accounts.stream()
+.collect(groupingBy(Account::getState, summingLong(Account::getBalance)));
+```
+In this example summingLong is a downstream collector for calculating the sum for each possible account state, groupingBy is the main collectors for collecting elements into a map.
+
+The result map has total values by each state represented in the data set.
+```
+{ REMOVED=0, ACTIVE=24133, BLOCKED=60000 }
+```
+Of course, we can create a reference to an instance of a combined collector and then pass it into collect() method.
+```
+Collector<Account, ?, Map<Account.State, Long>> summingByStates =
+groupingBy(Account::getState, summingLong(Account::getBalance));
+
+Map<Account.State, Long> sumByStates = accounts.stream().collect(summingByStates);
+```
+In conclusion, it should be noted that method collect() of a stream and Collectors have a lot of other features and applications to data processing. Don't be afraid and try to experiment with it.

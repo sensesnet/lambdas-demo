@@ -152,6 +152,4 @@ public class TestMain {
                 .flatMap(depart -> depart.getEmployees().stream()
                         .filter(employer -> employer.getSalary() >= threshold)).count();
     }
-
-
 }
