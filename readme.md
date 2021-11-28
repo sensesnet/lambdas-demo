@@ -517,4 +517,134 @@ to transform a stream of primitives into generalized stream there is boxed metho
 to transform a generalized stream into a stream of primitives there are special types of map function: **mapToInt, mapToLong, mapToDouble.**
 Pay attention there is no CharStream in Java.
 
+##Main topics:
 
+```
+map;
+flatMap;
+reduce;
+mapping and reducing with functions;
+forEach
+```
+##map
+The **map** operation transforms some elements into others (N to N transformation, no more, no less).
+
+Actually, map is often used to get a properties from stream of objects.
+
+For example, we have a list of job offers, each job has a title, description, salary and so on. We can create a list that includes all job titles:
+```
+List<String> titleList = jobList.stream().map(Job::getTitle).collect(Collectors.toList());
+```
+Another common use is to create **DTO** (it's not always good) for passing an object between modules or returning response from a service.
+
+Let's assume we have an account (id, number, sum, isLocked, created, lastUpdated, owner, ...) and user that is owner (id, firstName, lastName, phone, ...). We'd like to return a list of accounts through a service without unnecessary data. Then we do:
+```
+List<AccountInfo> infoList = accounts.stream()
+.map(a -> {
+AccountInfo info = new AccountInfo();
+info.setNumber(a.getNumber());
+info.setActive(!a.isLocked());
+info.setSum(a.getSum());
+String wholeName = a.getOwner().getFirstName() + a.getOwner().getLastName();
+info.setOwnerFullName(wholeName);
+return info;
+}).collect(Collectors.toList());
+```
+3) Sometimes map is used with **identity function** that applies x and returns x. You can use the lambda **x -> x** or **Function.identity()** for these purposes.
+
+##flatMap
+The flatMap operation is used to transform each element from a stream into another stream and concatenates all streams into one. For instance, to obtain elements of an internal collection in a class.
+
+Let's imagine there is a collection of java books exists. Each book has a title, a year of publishing and a list of authors (only names). It is necessary to obtain a collection of all authors from the list of java books.
+
+```
+// the collection of java books
+final List<Book> javaBooks = Stream.of(
+new Book("Java EE 7 Essentials", 2013, Arrays.asList("Arun Gupta")),
+new Book("Algorithms", 2011, Arrays.asList("Robert Sedgewick", "Kevin Wayne")),
+new Book("Clean code", 2014, Arrays.asList("Robert Martin"))
+).collect(Collectors.toList());
+
+// list of authors
+final List<String> authors = javaBooks.stream()
+.flatMap(book -> book.getAuthors().stream()) // many strams!!!
+.distinct()
+.collect(Collectors.toList());
+```
+
+The content of authors list:
+[Arun Gupta, Robert Sedgewick, Kevin Wayne, Robert Martin]
+
+
+##reduce
+The **reduce** operation combines elements into a single value. But how does it work?
+
+Let's assume we have a list of numbers 1, 2, ..., 7. Let's summarize the numbers using reduce:
+```
+int sum = numbers.stream().reduce(0, (acc, elem) -> acc + elem);
+```
+The first argument of reduce is a neutral element 0 (0 + elem = elem), the second argument is a sum function. The sum function accepts two parameters: acc is an accumulated value and elem is a next element in the stream.
+
+These are our calculations: (((((((0 + 1) + 2) + 3) + 4) + 5) + 6) + 7).
+
+We can see it if just add println into the lambda:
+```
+(acc, elem) -> {
+System.out.println("acc = " + acc + ", " + "elem = " + elem);
+return acc + elem;
+}
+```
+Output:
+```
+acc = 0, elem = 1
+acc = 1, elem = 2
+acc = 3, elem = 3
+acc = 6, elem = 4
+acc = 10, elem = 5
+acc = 15, elem = 6
+acc = 21, elem = 7
+```
+After computing 21 + 7 = 28.
+Accumulating is one of main principles of a reduction.
+
+##Mapping and reducing with functions
+As functions are presented as objects we can map and reduce them like values.
+
+For example, we have a collection of integer predicates. Let's negate each predicate using a map operator and then conjunct all predicates into one using a reduce operator.
+```
+public static IntPredicate negateEachAndConjunctAll(Collection<IntPredicate> predicates) {
+return predicates.stream()
+.map(IntPredicate::negate)
+.reduce(n -> true, IntPredicate::and);
+}
+```
+In this example, map negates each predicate in a stream and then reduce conjuncts all predicates into one. The initial value (seed) of reducing is a predicate that is always true, because it's the neutral value for a conjunction.
+
+![img.png](img.png)
+
+##forEach
+Stream API has some operations with side-effects such as forEach.
+
+For example, we have a list of accounts. Each account has a number, sum and isLocked flag (true, false). We'd like to block all accounts which have too much money (> 10 000 000 abstract units). And it's pretty simple:
+```
+accountList.stream()
+.filter(a -> a.getSum() > 10_000_000)
+.forEach(a -> a.setLocked(true));
+```
+Before blocking:
+```
+[
+Account{number='72300001', sum=888888777555, isLocked=false},
+Account{number='72300002', sum=222222222222, isLocked=false},
+Account{number='72300002', sum=7000000, isLocked=false}
+]
+```
+After blocking:
+```
+[
+Account{number='72300001', sum=888888777555, isLocked=true},
+Account{number='72300002', sum=222222222222, isLocked=true},
+Account{number='72300002', sum=7000000, isLocked=false}
+]
+```
+Also, **forEach** may be used for logging each element from a collection or during testing with assert statements inside a lambda.
