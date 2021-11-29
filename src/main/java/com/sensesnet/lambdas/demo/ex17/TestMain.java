@@ -1,13 +1,11 @@
 package com.sensesnet.lambdas.demo.ex17;
 
 import java.sql.Array;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.util.stream.Collectors.counting;
 import static java.util.stream.Collectors.summarizingLong;
 
 public class TestMain {
@@ -95,6 +93,15 @@ public class TestMain {
         Important. You should write only the collector in any valid formats but without ; on the end.
         It will be passed as an argument to the collect() method of a stream as shown below.
          */
+        List<LogEntry> logs = new ArrayList<>();
+        Map<String, Long> clickCount = logs.stream()
+                        .collect(Collectors.groupingBy(t -> t.getUrl(), Collectors.counting()));
+
+
+        /*
+
+         */
+
     }
 
     class Transaction {
@@ -137,6 +144,30 @@ public class TestMain {
 
         public String getNumber() {
             return number;
+        }
+    }
+
+    class LogEntry {
+        private final Date created;
+        private final String login;
+        private final String url;
+
+        public LogEntry(Date created, String login, String url) {
+            this.created = created;
+            this.login = login;
+            this.url = url;
+        }
+
+        public Date getCreated() {
+            return created;
+        }
+
+        public String getLogin() {
+            return login;
+        }
+
+        public String getUrl() {
+            return url;
         }
     }
 }

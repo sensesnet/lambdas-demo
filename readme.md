@@ -787,4 +787,270 @@ groupingBy(Account::getState, summingLong(Account::getBalance));
 
 Map<Account.State, Long> sumByStates = accounts.stream().collect(summingByStates);
 ```
-In conclusion, it should be noted that method collect() of a stream and Collectors have a lot of other features and applications to data processing. Don't be afraid and try to experiment with it.
+In conclusion, it should be noted that method collect() of a stream and Collectors have a lot of 
+other features and applications to data processing. Don't be afraid and try to experiment with it.
+
+###Main topics:
+
+###parallel and sequential streams;
+###performance of parallel streams;
+###some caveats.
+
+Parallel and sequential streams
+I won't write about the importance of parallel data processing because it's obvious, but I have to note that it's pretty easy to write parallel code with Stream API. No threads, no synchronized blocks, no wait and notify calling.
+
+There are several ways exist to create parallel streams:
+
+- to call **parallelStream()** method of a collection instead of```:
+```
+List<String> languages = Arrays.asList("java", "scala", "kotlin", "clojure", "C#");
+List<String> jvmLanguages = languages.parallelStream()
+.filter(lang -> !lang.equals("C#"))
+.collect(Collectors.toList());
+```
+
+- to transform an existing stream into a parallel stream using method parallel():
+```
+long[] numbers = LongStream
+.rangeClosed(0, 100_000)
+.parallel()
+.toArray();
+```
+
+Also there are additional convenient methods for working with parallel streams:
+
+- **isParallel()** allows to check the stream is parallel or no
+- **sequential()** returns an equivalent sequential stream
+
+Important. Any stream is either sequential or parallel, no mixed mode. If a stream pipeline has calls to both parallel and sequential methods, the last call wins.
+
+Note. Behind the scene parallel streams use ForkJoinPool introduced in Java 7.
+
+Ok, it's really easy to make a parallel stream. But only a parallel stream is not always more faster than an equivalent sequential stream.
+###Performance of parallel streams
+There are several factors to evaluate performance of a parallel stream.
+
+- **Size of data.** The more bigger size of data => the greater speedup.
+- **Boxing/Unboxing.** Primitive values are processed faster than boxed values.
+- **The number of cores are available at runtime.** The more available cores => the greater speedup.
+- **Cost per element processing.** The longer each element is processed => the more efficient parallelization. But it is not recommended to use parallel stream for performing too long operations (for example, network interconnection).
+- **Source data structure.** Usually initial data source is a collection. The easier it is splited into parts => the greater speedup. For example, ArrayList, arrays and IntStream.range() constructor are good sources for data splitting because they support random access. Other, such as LinkedList, Stream.iterate are bad sources for data splitting.
+- **Type of operations**: stateless or stateful. Stateless operations (examples: filter, map) are better for parallel processing than stateful operations (examples: distinct, sorted, limit).﻿
+
+Of course, these factors give only an approximate estimate, some reference points. In a real situation a measurement is required. Also consider whether you are ready to spend additional threads to your streams.
+
+##Some caveats
+Besides the fact that parallel streams does not always increase performance (and sometimes, decrease), there are some differences in the behavior of parallel and sequential streams. Be careful!
+
+**Addition**: If you know another features, please, write them to comments!
+
+**REDUCE AND NEUTRAL ELEMENT**
+
+Let's assume, you'd like to calculate sum of numbers and add 100 to the result. If you use sequential stream, you can set 100 as initial value of the reduce operation:
+```
+int result = numbers.stream().reduce(100, Integer::sum);
+```
+This code gives the same result as following:
+```
+int result = numbers.stream().reduce(0, Integer::sum) + 100;
+```
+
+But if you will use a parallel stream, the first code will give you a strange result. It's because your dataset will be splitted into some parts and 100 will be added to each part.
+
+**Conclusion**: use only neutral element as an initial value in the reduce operation with parallel streams!
+
+
+**FOREACH AND ORDER**
+
+Let's assume, we have a sorted list of numbers 1, 2, ..., 10. We'd like to process and print each number from the list using streams.
+
+**Using a sequential list:**
+```
+sortedNumbers.stream()
+.map(Function.identity()) // some processing
+.forEach(n -> System.out.print(n + " "));
+```
+
+The output:
+```
+1 2 3 4 5 6 7 8 9 10
+```
+
+**Using a parallel stream:**
+```
+sortedNumbers.parallelStream()
+.map(Function.identity()) // some processing
+.forEach(n -> System.out.print(n + " "));
+```
+The output:
+```
+6 7 9 10 8 3 4 1 5 2
+//Oops..!
+```
+
+Let's rewrite the code using **forEachOrdered**.
+```
+sortedNumbers.parallelStream()
+.map(Function.identity()) // some processing
+.forEachOrdered(n -> System.out.print(n + " "));
+```
+The output:
+```
+1 2 3 4 5 6 7 8 9 10
+//That's OK.
+```
+**Conclustion**: with parallel streams we should use forEachOrdered operation that keeps the order of the elements.
+
+
+**CONCAT AND ORDER**
+
+Let's assume, we'd like to get first three even numbers from a parallel stream of a two concatenated streams (filled one and empty one).
+```
+// create a filled list of integers
+List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+
+// create an empty list
+List<Integer> emptyList = Arrays.asList();
+```
+
+concatenating, processing and printing:
+```
+Stream.concat(numbers.stream(), emptyList.stream())
+.parallel()
+.filter(x -> x % 2 == 0)
+.limit(3)
+.forEachOrdered((n) -> System.out.print(n + " "));
+```
+The output:
+```
+2 4 6
+//That's OK.
+```
+If we create an empty list using Collections.emptyList(), then we have a problem, we may see other elements in output (always various).
+
+The output:
+```
+2 4 10
+//Oops..!
+```
+
+**It's because Collections.emptyList() doesn't report about its order and the stream can't use forEachOrdered correctly.**
+
+This caveat was taken from https://www.youtube.com/watch?v=TPHMyVyktsw&index=31&list=PLVe-2wcL84b-Waky1nkWVSNHPg6eOQWU9 [in russian].
+
+Conclusion: be careful with the order of elements in parallel streams.
+
+##Main topics:
+
+##returning functions;
+##currying.
+
+For more details, see:
+https://dzone.com/articles/whats-wrong-java-8-currying-vs [Java]
+http://lukajcb.github.io/blog/scala/2016/03/08/a-real-world-currying-example.html [Scala]
+
+##Returning functions
+As a function may be considered as an object we can accept it as a method argument and return it as a value.
+
+Let's consider the code below.
+```
+public static IntBinaryOperator sumF(IntUnaryOperator f) {
+return (a, b) -> f.applyAsInt(a) + f.applyAsInt(b);
+}
+```
+The method sumF accepts an operator f with an integer argument and returns another operator with two integer arguments. In the method body an two-arguments anonymous function is constructed and returned. This function applies f to each its argument and summarizes results.
+
+What can we do now?
+Let's write a function sumOfSquares in terms of sumF and then apply values.
+```
+// build a new sumOfSquares operator
+IntBinaryOperator sumOfSquares = sumF(x -> x * x);
+
+// the sum is equal to 125
+long sum = sumOfSquares.applyAsInt(5, 10);
+```
+Another example:
+```
+// sum of two identities: 0 + 10 = 10
+long sumOfIdentities = sumF(x -> x).applyAsInt(0, 10);
+
+// sum with coefficients: 10 * 2 + 11 * 2 = 42
+long sumWithCoefficient = sumF(x -> x * 2).applyAsInt(10, 11);
+
+// sum of two cubes: 3 * 3 * 3 + 8 * 8 * 8 = 539
+long sumOfCubes = sumF(x -> x * x * x).applyAsInt(3, 8);
+```
+As you can see, the possibility of returning functions opens easy way to build more complex and generalized functions.
+
+##Currying
+Currying is a technique of translating the evaluation of a function that takes multiple parameters into evaluating a sequence of functions, each with a single parameter.
+```
+IntBinaryOperator notCurriedFun = (x, y) -> x + y; // not a curried function
+
+IntFunction<IntUnaryOperator> curriedFun = x -> y -> x + y; // a curried function
+```
+We can define curried function with three arguments and then apply arguments one by one.
+```
+// curried function
+IntFunction<IntFunction<IntFunction<Integer>>> fff = x -> y -> z -> x * y + z;
+
+// fff returns a curried function y -> z -> 2 * y + z
+IntFunction<IntFunction<Integer>> ff = fff.apply(2);
+
+// ff returns a curried function z -> 2 * 3 + z
+IntFunction<Integer> f = ff.apply(3);
+
+// f returns 7
+int result = f.apply(1);
+```
+A more short example.
+```
+// the another result is equal to 153
+int anotherResult = fff.apply(10).apply(15).apply(3);
+```
+Let's rewrite the considered sumF method. Instead of this method returning a function we can write a curried function and then use it in the same way.
+
+```
+Function<IntUnaryOperator, IntBinaryOperator> sumF =
+(f) -> (a, b) -> f.applyAsInt(a) + f.applyAsInt(b);
+
+// build a new sumOfSquares operator in terms of sumF
+IntBinaryOperator sumOfSquares = sumF.apply(x -> x * x);
+
+// the sum is equal to 125 again
+long sum = sumOfSquares.applyAsInt(5, 10);
+```
+###As you see, returning functions and currying are very close concepts and both of them are based on **closures**.
+
+**Let's consider another example.**
+
+We would like to say "Hi" to our friends and "Hello" to our partners. We can create a function that has two arguments: what and whom. The function will apply what in dependency on the context.
+```
+Function<String, Consumer<String>> say = what -> whom -> System.out.println(what + ", " + whom);
+```
+The friends context:
+```
+List<String> friends = Arrays.asList("John", "Neal", "Natasha");
+Consumer<String> sayHi = say.apply("Hi");
+
+// too many lines of a code...
+
+friends.forEach(sayHi);
+```
+The partners context:
+```
+List<String> partners = Arrays.asList("Randolph Singleton", "Jessie James");
+Consumer<String> sayHello = say.apply("Hello");
+
+// somewhere in another method
+partners.forEach(sayHello);
+```
+The result:
+```
+Hi, John
+Hi, Neal
+Hi, Natasha
+Hello, Randolph Singleton
+Hello, Jessie James
+```
+Of course, we could get the person list from a database and a passing the consumer as a method parameter from another part of our program or do something more complex.
